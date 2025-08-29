@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sus-scanner"
+version = "0.1.0"
+description = "Chess.com Daily Suspicion Scanner – Tournament vs Non-Tournament play analysis"
+authors = [{ name = "Your Name", email = "your@email.com" }]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+dependencies = ["requests>=2.25.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "black", "flake8"]
+
+[project.scripts]
+sus-scanner = "sus_scanner.cli:main"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
