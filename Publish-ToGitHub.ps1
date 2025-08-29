@@ -1,3 +1,4 @@
+# Save as Publish-ToGitHub.ps1 and run from project root
 Param(
   [string]$Org = "chessdev-hub",
   [string]$Repo = "sus-scanner",
@@ -19,14 +20,17 @@ if (-not (Test-Path ".git")) {
   git init -b $DefaultBranch
   git add .
   git commit -m "Initial commit: SusScanner"
+} else {
+  git add .
+  git commit -m "chore: prepare publish" 2>$null
 }
 
 # ensure default branch exists
 try { git rev-parse --verify $DefaultBranch | Out-Null } catch { git checkout -b $DefaultBranch }
 
-# does repo already exist?
-$exists = $false
-try { gh repo view "$Org/$Repo" | Out-Null; $exists = $true } catch { $exists = $false }
+# Check repo existence using exit code
+gh repo view "$Org/$Repo" 1>$null 2>$null
+$exists = ($LASTEXITCODE -eq 0)
 
 if ($exists) {
   Write-Host "Repo $Org/$Repo exists. Linking remote and pushing..."
@@ -39,5 +43,4 @@ if ($exists) {
 }
 
 git push -u origin $DefaultBranch
-
 Write-Host "Done! Repo: https://github.com/$Org/$Repo"
