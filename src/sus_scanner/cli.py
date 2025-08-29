@@ -1,9 +1,14 @@
 import argparse
 from .scanner import SusScanner
 
+
 def main():
-    ap = argparse.ArgumentParser(description="Detect suspicious Daily players (Tournament vs Non-Tournament)")
-    ap.add_argument("usernames_file", help="Path to text file with one Chess.com username per line")
+    ap = argparse.ArgumentParser(
+        description="Detect suspicious Daily players (Tournament vs Non-Tournament)"
+    )
+    ap.add_argument(
+        "usernames_file", help="Path to text file with one Chess.com username per line"
+    )
     ap.add_argument("--lookback-months", type=int, default=2)
     ap.add_argument("--min-games", type=int, default=30)
     ap.add_argument("--tourn-min-games", type=int, default=15)

@@ -144,10 +144,20 @@ class SusScanner:
                     m.upset_wins += 1
 
         win_games = [g for g in rated if g.is_win]
-        short_wins = [g for g in win_games if (g.plies or 10**9) <= self.short_game_plies]
+        short_wins = [
+            g for g in win_games if (g.plies or 10**9) <= self.short_game_plies
+        ]
         m.short_win_rate = self._ratio(len(short_wins), max(1, len(win_games)))
 
-        timeoutish = [g for g in win_games if ("timeout" in g.end_reason or "abandon" in g.end_reason or "resign" in g.end_reason)]
+        timeoutish = [
+            g
+            for g in win_games
+            if (
+                "timeout" in g.end_reason
+                or "abandon" in g.end_reason
+                or "resign" in g.end_reason
+            )
+        ]
         m.timeout_win_ratio = self._ratio(len(timeoutish), max(1, len(win_games)))
 
         t_games = [g for g in rated if g.from_tournament]
@@ -163,26 +173,39 @@ class SusScanner:
         m.non_tourn_draws = sum(g.is_draw for g in nt_games)
         m.non_tourn_losses = sum(g.is_loss for g in nt_games)
 
-        m.tourn_win_rate = self._ratio(m.tourn_wins, max(1, m.tourn_games - m.tourn_draws))
-        m.non_tourn_win_rate = self._ratio(m.non_tourn_wins, max(1, m.non_tourn_games - m.non_tourn_draws))
+        m.tourn_win_rate = self._ratio(
+            m.tourn_wins, max(1, m.tourn_games - m.tourn_draws)
+        )
+        m.non_tourn_win_rate = self._ratio(
+            m.non_tourn_wins, max(1, m.non_tourn_games - m.non_tourn_draws)
+        )
         m.wr_gap = m.tourn_win_rate - m.non_tourn_win_rate
 
-        life_wr = self._ratio(m.lifetime_wins, max(1, m.lifetime_games - m.lifetime_draws))
+        life_wr = self._ratio(
+            m.lifetime_wins, max(1, m.lifetime_games - m.lifetime_draws)
+        )
         rec_wr = self._ratio(m.recent_wins, max(1, m.recent_games - m.recent_draws))
 
         score = 0.0
+
         def bump(points: float, reason: str):
             nonlocal score
             score += points
             m.reasons.append(reason)
 
-        if m.lifetime_games >= self.min_lifetime_games and life_wr >= self.high_win_rate:
+        if (
+            m.lifetime_games >= self.min_lifetime_games
+            and life_wr >= self.high_win_rate
+        ):
             bump(2.0, f"High lifetime WR {life_wr:.0%} over {m.lifetime_games} games")
 
         if m.recent_games >= self.recent_min_games:
             if rec_wr >= self.high_win_rate:
                 bump(2.0, f"High recent WR {rec_wr:.0%} over {m.recent_games} games")
-            if m.lifetime_games >= self.min_lifetime_games and (rec_wr - life_wr) >= self.spike_delta:
+            if (
+                m.lifetime_games >= self.min_lifetime_games
+                and (rec_wr - life_wr) >= self.spike_delta
+            ):
                 bump(1.5, f"Recent spike +{(rec_wr - life_wr):.0%} vs lifetime")
 
         if m.win_streak >= self.streak_suspect:
@@ -197,10 +220,15 @@ class SusScanner:
         if m.timeout_win_ratio >= self.finish_timeout_ratio_th and len(win_games) >= 10:
             bump(0.7, f"{m.timeout_win_ratio:.0%} of wins via resign/timeout")
 
-        if (m.tourn_games >= self.tourn_min_games and
-            m.non_tourn_games >= self.non_tourn_min_games and
-            m.wr_gap >= self.wr_gap_suspect):
-            bump(2.2, f"Tournament WR {m.tourn_win_rate:.0%} vs non-tournament {m.non_tourn_win_rate:.0%} (gap {m.wr_gap:.0%})")
+        if (
+            m.tourn_games >= self.tourn_min_games
+            and m.non_tourn_games >= self.non_tourn_min_games
+            and m.wr_gap >= self.wr_gap_suspect
+        ):
+            bump(
+                2.2,
+                f"Tournament WR {m.tourn_win_rate:.0%} vs non-tournament {m.non_tourn_win_rate:.0%} (gap {m.wr_gap:.0%})",
+            )
 
         m.suspicion_score = round(score, 2)
         return m
@@ -215,9 +243,17 @@ class SusScanner:
         print(header)
         print("-" * len(header))
         for m in metrics:
-            life_wr = (m.lifetime_wins / max(1, (m.lifetime_games - m.lifetime_draws))) if m.lifetime_games else 0
-            rec_wr  = (m.recent_wins  / max(1, (m.recent_games  - m.recent_draws))) if m.recent_games else 0
-            wdl  = f"{m.lifetime_wins}-{m.lifetime_draws}-{m.lifetime_losses}"
+            life_wr = (
+                (m.lifetime_wins / max(1, (m.lifetime_games - m.lifetime_draws)))
+                if m.lifetime_games
+                else 0
+            )
+            rec_wr = (
+                (m.recent_wins / max(1, (m.recent_games - m.recent_draws)))
+                if m.recent_games
+                else 0
+            )
+            wdl = f"{m.lifetime_wins}-{m.lifetime_draws}-{m.lifetime_losses}"
             rwdl = f"{m.recent_wins}-{m.recent_draws}-{m.recent_losses}"
             print(
                 f"{m.username:<20} {m.lifetime_games:>5} {wdl:>9} {life_wr:>7.0%} "
@@ -234,29 +270,83 @@ class SusScanner:
     def write_csv(self, path: str, metrics: List[UserMetrics]) -> None:
         with open(path, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
-            w.writerow([
-                "username",
-                "lifetime_games","lifetime_wins","lifetime_draws","lifetime_losses","lifetime_win_rate",
-                "recent_games","recent_wins","recent_draws","recent_losses","recent_win_rate",
-                "active_win_streak","max_win_streak","upset_wins",
-                "short_win_rate","timeout_win_ratio",
-                "tourn_games","tourn_wins","tourn_draws","tourn_losses","tourn_win_rate",
-                "non_tourn_games","non_tourn_wins","non_tourn_draws","non_tourn_losses","non_tourn_win_rate",
-                "wr_gap","suspicion_score","reasons"
-            ])
+            w.writerow(
+                [
+                    "username",
+                    "lifetime_games",
+                    "lifetime_wins",
+                    "lifetime_draws",
+                    "lifetime_losses",
+                    "lifetime_win_rate",
+                    "recent_games",
+                    "recent_wins",
+                    "recent_draws",
+                    "recent_losses",
+                    "recent_win_rate",
+                    "active_win_streak",
+                    "max_win_streak",
+                    "upset_wins",
+                    "short_win_rate",
+                    "timeout_win_ratio",
+                    "tourn_games",
+                    "tourn_wins",
+                    "tourn_draws",
+                    "tourn_losses",
+                    "tourn_win_rate",
+                    "non_tourn_games",
+                    "non_tourn_wins",
+                    "non_tourn_draws",
+                    "non_tourn_losses",
+                    "non_tourn_win_rate",
+                    "wr_gap",
+                    "suspicion_score",
+                    "reasons",
+                ]
+            )
             for m in metrics:
-                life_wr = (m.lifetime_wins / max(1, (m.lifetime_games - m.lifetime_draws))) if m.lifetime_games else 0
-                rec_wr  = (m.recent_wins  / max(1, (m.recent_games  - m.recent_draws))) if m.recent_games else 0
-                w.writerow([
-                    m.username,
-                    m.lifetime_games, m.lifetime_wins, m.lifetime_draws, m.lifetime_losses, f"{life_wr:.4f}",
-                    m.recent_games, m.recent_wins, m.recent_draws, m.recent_losses, f"{rec_wr:.4f}",
-                    m.win_streak, m.max_win_streak, m.upset_wins,
-                    f"{m.short_win_rate:.4f}", f"{m.timeout_win_ratio:.4f}",
-                    m.tourn_games, m.tourn_wins, m.tourn_draws, m.tourn_losses, f"{m.tourn_win_rate:.4f}",
-                    m.non_tourn_games, m.non_tourn_wins, m.non_tourn_draws, m.non_tourn_losses, f"{m.non_tourn_win_rate:.4f}",
-                    f"{m.wr_gap:.4f}", f"{m.suspicion_score:.2f}", " | ".join(m.reasons)
-                ])
+                life_wr = (
+                    (m.lifetime_wins / max(1, (m.lifetime_games - m.lifetime_draws)))
+                    if m.lifetime_games
+                    else 0
+                )
+                rec_wr = (
+                    (m.recent_wins / max(1, (m.recent_games - m.recent_draws)))
+                    if m.recent_games
+                    else 0
+                )
+                w.writerow(
+                    [
+                        m.username,
+                        m.lifetime_games,
+                        m.lifetime_wins,
+                        m.lifetime_draws,
+                        m.lifetime_losses,
+                        f"{life_wr:.4f}",
+                        m.recent_games,
+                        m.recent_wins,
+                        m.recent_draws,
+                        m.recent_losses,
+                        f"{rec_wr:.4f}",
+                        m.win_streak,
+                        m.max_win_streak,
+                        m.upset_wins,
+                        f"{m.short_win_rate:.4f}",
+                        f"{m.timeout_win_ratio:.4f}",
+                        m.tourn_games,
+                        m.tourn_wins,
+                        m.tourn_draws,
+                        m.tourn_losses,
+                        f"{m.tourn_win_rate:.4f}",
+                        m.non_tourn_games,
+                        m.non_tourn_wins,
+                        m.non_tourn_draws,
+                        m.non_tourn_losses,
+                        f"{m.non_tourn_win_rate:.4f}",
+                        f"{m.wr_gap:.4f}",
+                        f"{m.suspicion_score:.2f}",
+                        " | ".join(m.reasons),
+                    ]
+                )
 
     def _get_json(self, url: str, retries: int = 3, backoff: float = 0.8):
         for i in range(retries):
@@ -288,7 +378,9 @@ class SusScanner:
         fullmoves = len(re.findall(r"\b\d+\.", body))
         return 2 * fullmoves if fullmoves > 0 else None
 
-    def _fetch_daily_games(self, username: str, lookback_months: int) -> List[GameSummary]:
+    def _fetch_daily_games(
+        self, username: str, lookback_months: int
+    ) -> List[GameSummary]:
         archives = self._get_archives(username)
         if not archives:
             return []
@@ -334,23 +426,29 @@ class SusScanner:
                 plies = self._parse_plies_from_pgn(pgn)
                 from_tourn = "tournament" in g
 
-                is_win  = (result == "1-0" and is_white) or (result == "0-1" and not is_white)
-                is_loss = (result == "0-1" and is_white) or (result == "1-0" and not is_white)
-                is_draw = (result == "1/2-1/2")
+                is_win = (result == "1-0" and is_white) or (
+                    result == "0-1" and not is_white
+                )
+                is_loss = (result == "0-1" and is_white) or (
+                    result == "1-0" and not is_white
+                )
+                is_draw = result == "1/2-1/2"
 
-                results.append(GameSummary(
-                    result=result,
-                    is_win=is_win,
-                    is_loss=is_loss,
-                    is_draw=is_draw,
-                    my_rating=my_rating,
-                    opp_rating=opp_rating,
-                    plies=plies,
-                    end_reason=end_reason,
-                    is_rated=rated,
-                    from_tournament=from_tourn,
-                    end_time=end_time
-                ))
+                results.append(
+                    GameSummary(
+                        result=result,
+                        is_win=is_win,
+                        is_loss=is_loss,
+                        is_draw=is_draw,
+                        my_rating=my_rating,
+                        opp_rating=opp_rating,
+                        plies=plies,
+                        end_reason=end_reason,
+                        is_rated=rated,
+                        from_tournament=from_tourn,
+                        end_time=end_time,
+                    )
+                )
 
         return results
 
