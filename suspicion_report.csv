@@ -1,0 +1,2 @@
+username,lifetime_games,lifetime_wins,lifetime_draws,lifetime_losses,lifetime_win_rate,recent_games,recent_wins,recent_draws,recent_losses,recent_win_rate,active_win_streak,max_win_streak,upset_wins,short_win_rate,timeout_win_ratio,tourn_games,tourn_wins,tourn_draws,tourn_losses,tourn_win_rate,non_tourn_games,non_tourn_wins,non_tourn_draws,non_tourn_losses,non_tourn_win_rate,wr_gap,suspicion_score,reasons
+alalper,70,35,6,29,0.5469,70,35,6,29,0.5469,0,6,2,0.1429,0.2286,21,8,2,11,0.4211,49,27,4,18,0.6000,-0.1789,0.00,

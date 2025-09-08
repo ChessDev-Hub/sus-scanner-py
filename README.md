@@ -1,40 +1,62 @@
-# ♟️ SusScanner – Chess.com Daily Suspicion Scanner
+# SusScanner – Suspicious Daily Play Scanner (Elo-based)
 
-**SusScanner** is a Python module + CLI tool for analyzing Chess.com **Daily games** and detecting suspicious activity.  
-It compares **Tournament vs Non-Tournament** performance and flags large gaps, streaks, upset wins, short-game patterns, and timeout-heavy wins.
+This tool analyzes **Chess.com Daily** games and flags potentially suspicious accounts
+using **Elo overperformance** instead of raw win rates.
 
-## 🚀 Features
-- Fetches Daily games via the official Chess.com Published Data API
-- Tournament vs Non‑Tournament win rate comparison
-- Lifetime/recent win rates, active win streaks
-- Upset wins vs higher‑rated opponents
-- Short‑game and timeout/resign concentration checks
-- Composite suspicion score with human‑readable reasons
-- CLI and importable module, CSV export
+## What changed (core logic)
 
-## 📦 Install
+We now compute, for each rated game:
+
+- **Expected score (Elo)**: `E = 1 / (1 + 10^((opp - me)/400))`
+- **Actual score**: win = `1.0`, draw = `0.5`, loss = `0.0`
+- **Delta**: `actual - expected`
+
+We accumulate across games:
+
+- `EloGain = sum(max(0, delta))`
+- `EloLoss = sum(max(0, -delta))`
+- **EloRatio** = `EloGain / max(EloLoss, ε)` (ε avoids divide-by-zero)
+
+We compute these **overall**, **tournament**, and **non-tournament**, and then compare:
+
+- **EloRatioGap** = `TournamentEloRatio − NonTournamentEloRatio`
+
+Suspicion scoring now emphasizes **Elo overperformance** and **tournament vs non-tournament gaps**.
+
+## Why this is better
+
+Raw win rate can be misleading across rating ranges or mixed opposition.
+The Elo-based approach compares results against **opponent strength**, rewarding legitimate underdog wins
+and discounting wins that were already expected.
+
+## Current scoring (defaults)
+
+- `EloRatio ≥ 2.0` over enough games (≥ 20) → **+2.0**
+- `TournamentEloRatio − NonTournamentEloRatio ≥ 1.0` with each bucket ≥ 15 games → **+2.2**
+- Keep orthogonal context signals:
+  - Active win streak ≥ 8 → **+1.0**
+  - Upset wins ≥ 3 (≥ 250 rating diff) → **+1.0**
+  - Short wins ≥ 70% (≤ 40 plies, with ≥ 10 wins) → **+0.7**
+  - Resign/timeout wins ≥ 50% (with ≥ 10 wins) → **+0.7**
+
+> This is a **triage** tool to prioritize manual review. It does **not** assert cheating.
+
+## Usage
+
 ```bash
-pip install -r requirements.txt
-pip install -e .
+# From a usernames file
+python sus_scanner.py usernames.txt --lookback-months 3 --csv out.csv
+
+# Tune Elo thresholds if needed
+python sus_scanner.py usernames.txt --high-elo-ratio 2.5 --elo-ratio-gap 1.2
 ```
 
-## 🖥️ CLI Usage
-Prepare a text file with usernames (one per line), then run:
-```bash
-sus-scanner usernames.txt --lookback-months 3 --csv suspicion_report.csv
-```
+The console table shows per-user: overall/tournament/non-tournament **EloRatio**, the gap,
+streaks/upsets/short-wins/timeout pattern, legacy win-rate splits (for context), and the **suspicion score**.
+CSV export includes all fields.
 
-## 🐍 Module Usage
-```python
-from sus_scanner import SusScanner
-scanner = SusScanner(lookback_months=3, wr_gap_suspect=0.25)
-results = scanner.analyze_usernames_file("usernames.txt")
-scanner.print_table(results)
-scanner.write_csv("suspicion_report.csv", results)
-```
+## Data source
 
-## 📂 Layout
-- `src/sus_scanner/scanner.py` – core `SusScanner` implementation
-- `src/sus_scanner/cli.py` – command‑line entrypoint (`sus-scanner`)
-- `examples/demo.py` – minimal example
-- `tests/test_scanner.py` – simple sanity test
+Public Chess.com player archives for **Daily** time control (rated only). The code parses PGN headers
+for result/termination and uses the API-provided end-of-game ratings to compute expected scores
+and the Elo over/under-performance totals.
